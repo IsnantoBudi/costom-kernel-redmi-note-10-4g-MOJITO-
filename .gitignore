@@ -1,0 +1,18 @@
+# Toolchains and Build Artifacts
+toolchain/
+out/
+anykernel3/
+kernel custom/
+
+# Large binaries & Stock Images (>100MB)
+output/*.img
+output/*.bin
+output/stock_recovery/
+output/*20261020*.zip
+
+# OS and Temporary files
+*.tmp
+*.log
+*~
+.DS_Store
+Thumbs.db
