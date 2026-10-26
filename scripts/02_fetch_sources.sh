@@ -63,7 +63,7 @@ if [ ! -d "$ANYKERNEL_DIR" ]; then
         cat << 'EOF' > "$ANYKERNEL_DIR/anykernel.sh"
 ### AnyKernel3 Packaging Config for Redmi Note 10 4G (mojito/sunny)
 properties() { '
-kernel.string=Clean & Cool Kernel for Redmi Note 10 4G (MIUI 14)
+kernel.string=UltraCool & FastCharge Kernel for Redmi Note 10 4G (MIUI 14)
 do.devicecheck=1
 do.modules=0
 do.systemless=1
@@ -77,22 +77,42 @@ supported.versions=11-13
 supported.patchlevels=
 '; }
 
-# boot shell variables
-BLOCK=boot;
-IS_SLOT_DEVICE=0;
+# shell variables (Case-sensitive in recovery shell; direct block path prevents partition detection failure)
+BLOCK=/dev/block/bootdevice/by-name/boot;
+block=/dev/block/bootdevice/by-name/boot;
+IS_SLOT_DEVICE=auto;
+is_slot_device=auto;
 RAMDISK_COMPRESSION=auto;
+ramdisk_compression=auto;
 PATCH_VBMETA_FLAG=auto;
+patch_vbmeta_flag=auto;
 
-# import functions/variables and setup patching
+## AnyKernel methods (DO NOT CHANGE)
+# import patching functions/variables - see for reference
 . tools/ak3-core.sh;
 
-# boot install
-split_boot;
-flash_boot;
-if [ -f /tmp/anykernel/dtbo.img ]; then
-    flash_dtbo;
-fi
-### end boot install
+## AnyKernel boot install
+dump_boot;
+
+# begin ramdisk changes
+
+write_boot;
+## end boot install
+
+# AnyKernel vendor_boot install (Device Tree & OPP Freq Capping)
+BLOCK=/dev/block/bootdevice/by-name/vendor_boot;
+block=/dev/block/bootdevice/by-name/vendor_boot;
+IS_SLOT_DEVICE=auto;
+is_slot_device=auto;
+
+reset_ak;
+
+dump_boot;
+
+# begin ramdisk changes
+
+write_boot;
+## end vendor_boot install
 EOF
     fi
     echo ">> AnyKernel3 berhasil dikonfigurasi."

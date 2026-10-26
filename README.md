@@ -75,13 +75,90 @@ bash build_all.sh
 
 ---
 
-## 🛡️ Panduan Flashing via Custom Recovery
+## 🛡️ Panduan Masuk TWRP & Flashing Custom Kernel
 
-1. Salin salah satu file zip pilihan Anda dari folder `output/` ke penyimpanan internal ponsel atau flashdisk OTG.
-2. Masuk ke **TWRP / OrangeFox Recovery** (`Volume Atas + Tombol Power`).
-3. Pilih menu **Install** > pilih file zip kernel yang diinginkan.
-4. Geser untuk konfirmasi flash (**Swipe to Confirm Flash**).
-5. Pilih **Reboot System**.
+### A. Cara Masuk ke TWRP / OrangeFox via File .img di Fastboot (Tanpa Menimpa Kernel)
+Redmi Note 10 4G (`mojito`/`sunny`) menggunakan skema partisi A/B tanpa partisi recovery tersendiri. Anda dapat memuat file image recovery secara sementara ke RAM tanpa merusak instalasi kernel yang ada:
+
+* **Opsi 1: Menggunakan Skrip Otomatis 1-Klik (Windows)**:
+  1. Letakkan file image recovery Anda (misal `twrp-mojito.img` atau `orangefox.img`) di folder ini, atau cukup seret *(drag-and-drop)* file `.img` ke atas file skrip.
+  2. Matikan ponsel, masuk ke mode Fastboot (`Tombol Power + Volume Bawah`).
+  3. Hubungkan ponsel ke komputer dengan kabel USB.
+  4. Jalankan [MASUK_TWRP_FASTBOOT.bat](MASUK_TWRP_FASTBOOT.bat). Ponsel akan otomatis booting langsung ke antarmuka TWRP.
+
+* **Opsi 2: Perintah Manual via Terminal / Command Prompt**:
+  ```bash
+  # 1. Pastikan perangkat terdeteksi di mode Fastboot:
+  fastboot devices
+
+  # 2. Booting image TWRP ke RAM:
+  fastboot boot nama_file_twrp.img
+  ```
+
+> [!NOTE]
+> Jangan gunakan perintah `fastboot flash recovery` karena Redmi Note 10 tidak memiliki partisi `recovery` terpisah. Perintah `fastboot boot` memuat recovery ke memori RAM secara aman.
+
+---
+
+### B. Prosedur Flashing Kernel via Recovery:
+
+1. Salin file zip kernel pilihan Anda dari folder `output/` (misalnya `AnyKernel3-Mojito-MIUI14-UltraCool-FastCharge-latest.zip`) ke penyimpanan internal ponsel atau flashdisk OTG.
+2. Di antarmuka **TWRP / OrangeFox**, pilih menu **Install** > cari file zip kernel.
+3. ⚠️ **Pastikan kotak centang `[ ] Zip signature verification` TIDAK DICENTANG**.
+4. Geser tombol konfirmasi (**Swipe to Confirm Flash**).
+   - *Catatan: Installer AnyKernel3 akan otomatis memperbarui kernel pada partisi `boot` dan tabel frekuensi pada `vendor_boot`.*
+5. Setelah selesai, pilih **Reboot System**.
+
+---
+
+## ⚠️ Panduan Kritis AnyKernel3 & AI Guardrails (Anti-Regression)
+
+Untuk mencegah error `Unable to determine partition` atau `Updater process ended with ERROR: 1`, setiap perubahan konfigurasi installer wajib mematuhi aturan baku berikut:
+
+1. **Sensitivitas Huruf (Case-Sensitivity)**:
+   - Shell environment di Android recovery (`ash`) bersifat **case-sensitive**.
+   - Variabel konfigurasi target blok partisi **WAJIB HURUF KAPITAL**:
+     ```sh
+     BLOCK=/dev/block/bootdevice/by-name/boot;
+     block=/dev/block/bootdevice/by-name/boot;
+     IS_SLOT_DEVICE=auto;
+     is_slot_device=auto;
+     ```
+   - ⚠️ *Dilarang keras hanya menggunakan huruf kecil (`block=boot;`)* karena `ak3-core.sh` membaca `$BLOCK`. Jika huruf kecil, `$BLOCK` bernilai kosong sehingga TWRP menampilkan error: `Unable to determine  partition. Aborting...`.
+
+2. **Jalur Blok Partisi Absolut**:
+   - Selalu gunakan `/dev/block/bootdevice/by-name/boot` daripada sekadar `boot` agar pengenal partisi A/B slot pada UFS Snapdragon 678 terdeteksi instan tanpa mengandalkan pencarian dinamis yang lambat/gagal di TWRP.
+
+3. **Dual-Flash Partisi `boot` dan `vendor_boot` (Android 12 Boot Header v3)**:
+   - Partisi `boot` menyimpan kernel biner `Image.gz`, sedangkan partisi `vendor_boot` memuat Device Tree Blob (`dtb` / tabel OPP frekuensi).
+   - Skrip `anykernel.sh` memproses kedua partisi secara berurutan dalam 1x flash di TWRP/OrangeFox:
+     ```sh
+     ## AnyKernel boot install
+     dump_boot;
+     write_boot;
+     ## end boot install
+
+     # vendor_boot install (Device Tree & OPP Table)
+     BLOCK=/dev/block/bootdevice/by-name/vendor_boot;
+     block=/dev/block/bootdevice/by-name/vendor_boot;
+     IS_SLOT_DEVICE=auto;
+     is_slot_device=auto;
+
+     reset_ak;
+
+     dump_boot;
+     write_boot;
+     ## end vendor_boot install
+     ```
+
+4. **Thermal Mitigation Floor & Qualcomm OSM Boost Bypass**:
+   - Big Core (Kryo 460 Gold) dibatasi maksimal di **1.90 GHz** dan Little Core (Kryo 460 Silver) di **1.51 GHz**.
+   - Driver clock Qualcomm `clk-cpu-osm.c` dipatch agar tidak membangkitkan kembali frekuensi puncak sebagai `CPUFREQ_BOOST_FREQ`.
+   - Driver thermal `cpu_cooling.c` dan `cpufreq.c` dipasang *hard floor* di **1.516 GHz** sehingga Big Core tidak pernah lagi anjlok ke 1.20 GHz saat uji beban panjang. Seluruh 8 core bekerja sinkron dan stabil di 80%–85% sustained performance (~94k GIPS).
+
+---
+
+## 🔄 Pemulihan ke Kernel Bawaan Pabrik
 
 > [!TIP]
-> Jika sewaktu-waktu ingin kembali ke kernel stock bawaan pabrik, gunakan skrip [PULIHKAN_HP_STOCK_BOOT.bat](PULIHKAN_HP_STOCK_BOOT.bat) dengan menghubungkan ponsel pada mode Fastboot.
+> Jika sewaktu-waktu ingin kembali ke kernel stock bawaan resmi MIUI 14, hubungkan ponsel dalam mode Fastboot lalu jalankan skrip [PULIHKAN_HP_STOCK_BOOT.bat](PULIHKAN_HP_STOCK_BOOT.bat). Skrip akan mengembalikan partisi `boot` ke kondisi original pabrik.

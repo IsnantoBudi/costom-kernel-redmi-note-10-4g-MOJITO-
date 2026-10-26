@@ -35,10 +35,22 @@ index 241cec4d5..5e479e7f3 100644
  	mi,use-bq-pump;
  	qcom,distinguish-qc-class-ab;
 diff --git a/arch/arm64/boot/dts/qcom/sm6150.dtsi b/arch/arm64/boot/dts/qcom/sm6150.dtsi
-index c46629345..f12fdfd4b 100644
+index c46629345..d6b9bff78 100644
 --- a/arch/arm64/boot/dts/qcom/sm6150.dtsi
 +++ b/arch/arm64/boot/dts/qcom/sm6150.dtsi
-@@ -3212,8 +3212,5 @@
+@@ -3197,10 +3197,7 @@
+ 	<1017600>,
+ 	<1209600>,
+ 	<1363200>,
+-	<1516800>,
+-	<1593600>,
+-	<1708800>,
+-	<1804800>;
++	<1516800>;
+ 
+ 	qcom,cpufreq-table-6 =
+ 	< 300000>,
+@@ -3212,8 +3209,5 @@
  	<1363200>,
  	<1516800>,
  	<1708800>,
@@ -294,3 +306,89 @@ index b43531899..0e1bc990a 100644
  		    table[i].addr < relative_base)
  			relative_base = table[i].addr;
  }
+diff --git a/drivers/clk/qcom/clk-cpu-osm.c b/drivers/clk/qcom/clk-cpu-osm.c
+index f50a7ba08..4e0d83594 100644
+--- a/drivers/clk/qcom/clk-cpu-osm.c
++++ b/drivers/clk/qcom/clk-cpu-osm.c
+@@ -723,13 +723,7 @@ static int osm_cpufreq_cpu_init(struct cpufreq_policy *policy)
+ 
+ 		/* Two of the same frequencies means end of table */
+ 		if (i > 0 && table[i - 1].driver_data == table[i].driver_data) {
+-			struct cpufreq_frequency_table *prev = &table[i - 1];
+-
+-			if (prev->frequency == CPUFREQ_ENTRY_INVALID) {
+-				prev->flags = CPUFREQ_BOOST_FREQ;
+-				prev->frequency = prev->driver_data;
+-			}
+-
++			/* Do not revive dropped frequencies as boost frequencies */
+ 			break;
+ 		}
+ 	}
+@@ -780,7 +774,7 @@ static struct cpufreq_driver qcom_osm_cpufreq_driver = {
+ 	.fast_switch	= osm_cpufreq_fast_switch,
+ 	.name		= "osm-cpufreq",
+ 	.attr		= osm_cpufreq_attr,
+-	.boost_enabled	= true,
++	.boost_enabled	= false,
+ };
+ 
+ static u32 find_voltage(struct clk_osm *c, unsigned long rate)
+diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
+index a5a84f9c1..0a28388d8 100644
+--- a/drivers/cpufreq/cpufreq.c
++++ b/drivers/cpufreq/cpufreq.c
+@@ -746,7 +746,31 @@ static ssize_t store_##file_name					\
+ }
+ 
+ store_one(scaling_min_freq, min);
+-store_one(scaling_max_freq, max);
++static ssize_t store_scaling_max_freq
++(struct cpufreq_policy *policy, const char *buf, size_t count)
++{
++	int ret, temp;
++	struct cpufreq_policy new_policy;
++
++	memcpy(&new_policy, policy, sizeof(*policy));
++	new_policy.min = policy->user_policy.min;
++	new_policy.max = policy->user_policy.max;
++
++	ret = sscanf(buf, "%u", &new_policy.max);
++	if (ret != 1)
++		return -EINVAL;
++
++	/* Thermal floor: do not allow userspace (mi_thermald) to throttle below 1.516 GHz */
++	if (new_policy.max < 1516800)
++		new_policy.max = 1516800;
++
++	temp = new_policy.max;
++	ret = cpufreq_set_policy(policy, &new_policy);
++	if (!ret)
++		policy->user_policy.max = temp;
++
++	return ret ? ret : count;
++}
+ 
+ /**
+  * show_cpuinfo_cur_freq - current CPU frequency as detected by hardware
+diff --git a/drivers/thermal/cpu_cooling.c b/drivers/thermal/cpu_cooling.c
+index 9ba496198..deb93f6b9 100644
+--- a/drivers/thermal/cpu_cooling.c
++++ b/drivers/thermal/cpu_cooling.c
+@@ -319,6 +319,8 @@ static int cpufreq_thermal_notifier(struct notifier_block *nb,
+ 		if (cpufreq_cdev->floor_freq > floor_freq)
+ 			floor_freq = cpufreq_cdev->floor_freq;
+ 	}
++	if (clipped_freq < 1516800)
++		clipped_freq = 1516800;
+ 	/*
+ 	 * policy->max is the maximum allowed frequency defined by user
+ 	 * and clipped_freq is the maximum that thermal constraints
+@@ -746,6 +748,8 @@ static int cpufreq_set_cur_state(struct thermal_cooling_device *cdev,
+ 	}
+ update_frequency:
+ 	clip_freq = cpufreq_cdev->freq_table[state].frequency;
++	if (clip_freq < 1516800)
++		clip_freq = 1516800;
+ 	cpufreq_cdev->cpufreq_state = state;
+ 	cpufreq_cdev->clipped_freq = clip_freq;

@@ -11,9 +11,14 @@ echo    (Caranya: Tekan dan tahan tombol POWER + VOLUME BAWAH)
 echo 2. Hubungkan HP ke Laptop/PC dengan kabel data USB.
 echo.
 echo Menunggu HP terdeteksi di Fastboot...
-fastboot wait-for-device
+:wait_fastboot
+fastboot devices 2>nul | findstr /i "fastboot" >nul
+if %errorlevel% neq 0 (
+    timeout /t 1 /nobreak >nul
+    goto :wait_fastboot
+)
 echo.
-echo >> HP Terdeteksi! Memasang kernel stock resmi MIUI 14...
+echo ^>^> HP Terdeteksi! Memasang kernel stock resmi MIUI 14...
 fastboot flash boot "%~dp0output\stock_boot_MIUI14_V14.0.6.0.SKGEUXM.img"
 if %errorlevel% neq 0 (
     echo.
@@ -22,7 +27,7 @@ if %errorlevel% neq 0 (
     exit /b %errorlevel%
 )
 echo.
-echo >> Sukses terpasang! Me-restart HP ke sistem MIUI 14...
+echo ^>^> Sukses terpasang! Me-restart HP ke sistem MIUI 14...
 fastboot reboot
 echo.
 echo ==========================================================

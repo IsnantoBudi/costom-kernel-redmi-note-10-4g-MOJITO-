@@ -88,9 +88,9 @@ supported.versions=11-13
 supported.patchlevels=
 '; }
 
-# shell variables
-BLOCK=boot;
-block=boot;
+# shell variables (Case-sensitive in recovery shell; direct block path prevents partition detection failure)
+BLOCK=/dev/block/bootdevice/by-name/boot;
+block=/dev/block/bootdevice/by-name/boot;
 IS_SLOT_DEVICE=auto;
 is_slot_device=auto;
 RAMDISK_COMPRESSION=auto;
@@ -109,6 +109,21 @@ dump_boot;
 
 write_boot;
 ## end boot install
+
+# AnyKernel vendor_boot install (Device Tree & OPP Freq Capping)
+BLOCK=/dev/block/bootdevice/by-name/vendor_boot;
+block=/dev/block/bootdevice/by-name/vendor_boot;
+IS_SLOT_DEVICE=auto;
+is_slot_device=auto;
+
+reset_ak;
+
+dump_boot;
+
+# begin ramdisk changes
+
+write_boot;
+## end vendor_boot install
 EOF
 
 # 6. Setup Environment Variabel Kompilasi
@@ -203,6 +218,15 @@ cp -r "$ANYKERNEL_DIR" "$AK3_TMP"
 # Salin kernel image murni (Sesuai spesifikasi Header v3 Android 12)
 rm -f "$AK3_TMP/Image.gz-dtb"
 cp "$KERNEL_IMAGE" "$AK3_TMP/Image.gz"
+
+# Salin dtb terkompilasi (Berisi tabel frekuensi CPU capping 1.90 GHz & Fast Charging)
+DTB_FILE="$OUT_DIR/arch/arm64/boot/dts/qcom/sm6150.dtb"
+if [ -f "$DTB_FILE" ]; then
+    cp "$DTB_FILE" "$AK3_TMP/dtb"
+    echo ">> dtb (sm6150.dtb) disertakan dalam package AnyKernel3."
+else
+    echo ">> [WARNING] sm6150.dtb tidak ditemukan di $DTB_FILE!"
+fi
 
 # Salin dtbo.img jika ada
 if [ -f "$OUT_DIR/arch/arm64/boot/dtbo.img" ]; then

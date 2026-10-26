@@ -8,6 +8,7 @@ kernel custom/
 output/*.img
 output/*.bin
 output/stock_recovery/
+output/*20261026_*.zip
 
 # OS and Temporary files
 *.tmp
