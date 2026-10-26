@@ -5,24 +5,30 @@ Suite otomasi kompilasi custom kernel yang dirancang khusus agar **ringan, adem,
 
 ---
 
-## 📦 3 Pilihan Varian Kernel (Tersedia di Folder `output/`)
+## 📦 5 Pilihan Varian Kernel (Tersedia di Folder `output/`)
 
-Repositori ini menyediakan 3 varian kernel flashable zip siap pakai yang disesuaikan dengan kebutuhan preferensi pengguna:
+Repositori ini menyediakan 5 varian kernel flashable zip siap pakai yang disesuaikan dengan kebutuhan preferensi performa, termal, dan daya baterai:
 
-| Varian / Nama File | Profil Charging | CPU & GPU Profile | Karakteristik & Rekomendasi |
+| Varian / Nama File | Batas Frekuensi CPU (Big / Little) | Profil Charging & Thermal Floor | Karakteristik & Rekomendasi |
 | :--- | :--- | :--- | :--- |
-| **1. Normal Charging**<br>`output/AnyKernel3-Mojito-MIUI14-Cool-20261020_1342 normal charging.zip` | Standar Pabrik Xiaomi (Batas suhu 45°C, screen-on 1000mA) | CPU Standar (hingga 2.21 GHz), GPU Standar (hingga 845 MHz) | **Paling Aman untuk Baterai**: Menggunakan kurva pengisian daya original bawaan pabrik, dipadukan dengan optimasi scheduler Schedutil, ZRAM LZ4, dan TCP BBR agar baterai awet jangka panjang. |
-| **2. Fast Charging**<br>`output/AnyKernel3-Mojito-MIUI14-Cool-20261020_1421 fast charging.zip` | Aggressive 33W (Screen-on ~4.5A / 22W, Thermal limit 47°C, step-chg s/d 90%) | CPU Standar (hingga 2.21 GHz), GPU Standar (hingga 845 MHz) | **Performa Penuh & Fast Charge**: Kecepatan clock prosesor tetap standar bawaan Qualcomm (2.21 GHz), namun pengisian daya dilonggarkan agresif agar ngecas tetap kilat meski layar menyala. |
-| **3. UltraCool & FastCharge (Recommended)**<br>`output/AnyKernel3-Mojito-MIUI14-UltraCool-FastCharge-20261020_1447.zip`<br>*(Simbolis: `output/AnyKernel3-Mojito-MIUI14-UltraCool-FastCharge-latest.zip`)* | Aggressive 33W (Screen-on ~4.5A / 22W, Thermal limit 47°C, step-chg s/d 90%) | **CPU Capped @ 1.90 GHz**, **GPU Capped @ 700 MHz**, **Schedutil 500µs / 30ms** | **Paling Adem, Hemat Daya & Ngecas Kilat**: Edisi unggulan yang memangkas frekuensi rakus daya (+64% power) dan mengunci latensi respons UI 60 FPS tanpa micro-stutter. Suhu ponsel paling dingin untuk pemakaian harian & gaming. |
+| **1. UltraCool (Recommended)**<br>`output/AnyKernel3-Mojito-UltraCool-Big1.9-Little1.5.zip`<br>*(Alias: `AnyKernel3-Mojito-MIUI14-UltraCool-FastCharge-latest.zip`)* | **Big: 1.90 GHz** (`1900800`)<br>**Little: 1.51 GHz** (`1516800`) | Aggressive 33W Fast Charge<br>Thermal Floor @ **1.51 GHz** | **Paling Adem & Baterai Paling Awet (Sudah Teruji Fisik)**: Menghapus step frekuensi terpanas, menjaga suhu ponsel tetap dingin, dan mencegah CPU throttling drop ke 1.20 GHz. Sustained performance stabil di ~94 GIPS. |
+| **2. Cool (Sweet Spot)**<br>`output/AnyKernel3-Mojito-Cool-Big2.0-Little1.6.zip` | **Big: 2.01 GHz** (`2016000`)<br>**Little: 1.59 GHz** (`1593600`) | Aggressive 33W Fast Charge<br>Thermal Floor @ **1.51 GHz** | **Keseimbangan Ideal Harian**: Sedikit lebih bertenaga dibanding UltraCool untuk multitasking harian yang padat, dengan efisiensi termal yang tetap terkendali. |
+| **3. Performance**<br>`output/AnyKernel3-Mojito-Performance-Big2.1-Little1.7.zip` | **Big: 2.11 GHz** (`2112000`)<br>**Little: 1.70 GHz** (`1708800`) | Aggressive 33W Fast Charge<br>Thermal Floor @ **1.51 GHz** | **Gaming Responsif Tanpa Overheat**: Membuka clock 2.11 GHz untuk framerate game kompetitif, namun tetap memotong step frekuensi puncak 2.21 GHz yang paling rakus daya dan panas. |
+| **4. StockMax**<br>`output/AnyKernel3-Mojito-StockMax-Big2.2-Little1.7.zip` | **Big: 2.20 GHz** (`2208000`)<br>**Little: 1.70 GHz** (`1708800`) | Aggressive 33W Fast Charge<br>Thermal Floor @ **1.51 GHz** | **Performa Big Core Maksimal Bawaan**: Memanfaatkan clock penuh 2.20 GHz Kryo 460 Gold standar pabrik, dipadu dengan Little Core 1.70 GHz yang lebih hemat daya. |
+| **5. FullStock**<br>`output/AnyKernel3-Mojito-FullStock-Big2.2-Little1.8.zip` | **Big: 2.20 GHz** (`2208000`)<br>**Little: 1.80 GHz** (`1804800`) | Aggressive 33W Fast Charge<br>Thermal Floor @ **1.51 GHz** | **100% Frekuensi Bawaan Pabrik**: Clock CPU standar pabrik seutuhnya, namun sudah dilengkapi perbaikan Qualcomm OSM boost bypass, thermal floor mitigation (anti drop ke 1.2 GHz), dan Fast Charge 33W. |
 
 ---
 
 ## ⚡ Detail Lokasi & Arsitektur Optimalisasi
 
-### 1. Optimalisasi Manajemen Daya & Temperatur (UltraCool Edition):
-* **CPU Big Core Capping (`arch/arm64/boot/dts/qcom/sm6150.dtsi`)**:
-  - Frekuensi Big Core Kryo 460 Gold dikunci maksimal pada **1.90 GHz** (`1900800`).
-  - Menghilangkan frekuensi 2.11 GHz dan 2.21 GHz yang menghasilkan lonjakan tegangan dan panas tertinggi, tanpa menurunkan kelancaran render UI layar 60Hz.
+### 1. Optimalisasi Manajemen Daya & Temperatur:
+* **CPU Frequency Capping & OPP Table (`arch/arm64/boot/dts/qcom/sm6150.dtsi`)**:
+  - Disesuaikan per-varian melalui Device Tree Blob (`dtb`) di partisi `vendor_boot`.
+  - Dilengkapi patch bypass `CPUFREQ_BOOST_FREQ` pada `drivers/clk/qcom/clk-cpu-osm.c` (`.boost_enabled = false`) agar capping frekuensi benar-benar terkunci pada hardware Snapdragon 678.
+* **Thermal Throttling Floor Mitigation @ 1.516 GHz**:
+  - `drivers/thermal/cpu_cooling.c`: Memastikan batas bawah mitigasi termal kernel (`clip_freq`) tidak jatuh di bawah 1.516 GHz.
+  - `drivers/cpufreq/cpufreq.c`: Mencegah daemon thermal pengguna (`mi_thermald`) mencekik `scaling_max_freq` di bawah 1.516 GHz saat ponsel hangat.
+  - `arch/arm64/boot/dts/qcom/sm6150-thermal.dtsi`: Mengatur `low_limits_floor` pada seluruh 16 thermal zones agar sinkron dengan tabel frekuensi.
 * **Governor Anti-Stutter (`kernel/sched/cpufreq_schedutil.c`)**:
   - `up_rate_limit_us = 500`: Lompatan frekuensi super responsif (0.5 milidetik) saat jari menyentuh layar agar animasi 60 FPS tidak drop.
   - `down_rate_limit_us = 30000`: Tahanan frekuensi 30 milidetik saat jeda render frame untuk mencegah osilasi naik-turun frekuensi penyebab *micro-stutter*.
@@ -37,9 +43,12 @@ Repositori ini menyediakan 3 varian kernel flashable zip siap pakai yang disesua
 * **Relaxed Step-Charging Curve (`arch/arm64/boot/dts/qcom/sm6150-idp.dtsi`)**:
   - Mempertahankan arus 5.6A - 4.8A hingga ambang voltase 4.47V (~90% kapasitas baterai) sebelum melambat ke tahap akhir.
 
-### 3. Kepatuhan Android 12 & AnyKernel3:
-* **Android Boot Header v3**: Binary berupa `Image.gz` murni tanpa appended DTB, mencegah kerusakan kalkulasi offset ramdisk pada bootloader Qualcomm ABL.
-* **Deteksi Partisi Dinamis**: Menggunakan `BLOCK=boot;` dan `IS_SLOT_DEVICE=auto;` pada `anykernel.sh` agar kompatibel di semua TWRP dan OrangeFox.
+### 3. Kepatuhan Android 12 Boot Header v3 & AnyKernel3:
+* **Dual-Flash Partition Flashing (`anykernel.sh`)**:
+  - Android 12 Boot Header v3 memisahkan biner kernel (`Image.gz` pada partisi `boot`) dan Device Tree (`dtb` pada partisi `vendor_boot`).
+  - `anykernel.sh` mem-flash kedua partisi secara atomik dalam 1x klik flash di recovery.
+* **Case-Sensitivity & Absolute Block Path**:
+  - Menggunakan huruf kapital `BLOCK=/dev/block/bootdevice/by-name/boot` dan `IS_SLOT_DEVICE=auto` agar tidak terjadi error `Unable to determine partition` di recovery TWRP / OrangeFox.
 
 ---
 
@@ -51,11 +60,14 @@ Repositori ini menyediakan 3 varian kernel flashable zip siap pakai yang disesua
 ├── scripts/
 │   ├── 01_setup_wsl_env.sh      # Setup toolchain dan dependensi WSL2 Ubuntu
 │   ├── 02_fetch_sources.sh      # Unduh Proton-Clang & source kernel mojito
-│   └── 03_build_kernel.sh       # Kompilasi Clang & pembuatan AnyKernel3 zip
+│   ├── 03_build_kernel.sh       # Kompilasi Clang & pembuatan AnyKernel3 zip
+│   ├── build_variants.py        # Generator otomasi multi-varian (1.9 s/d 2.2 GHz)
+│   └── build_variants.sh        # Runner bash untuk build_variants.py
 ├── patches/
 │   ├── mojito_cool_balanced.cfg # Fragment konfigurasi kernel hemat daya
 │   └── 0001-mojito-ultracool-fastcharge.patch # Patch driver charging, CPU/GPU, & Schedutil
-├── output/                      # Berisi 3 varian flashable zip AnyKernel3
+├── output/                      # Berisi 5 varian flashable zip AnyKernel3
+├── KIRIM_KERNEL_KE_HP.bat       # Menu interaktif kirim varian kernel via ADB
 ├── PULIHKAN_HP_STOCK_BOOT.bat   # Skrip pemulihan instan 1-klik via Fastboot
 └── README.md                    # Dokumentasi proyek
 ```

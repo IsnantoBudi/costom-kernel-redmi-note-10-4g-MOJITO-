@@ -1,6 +1,6 @@
 ### AnyKernel3 Packaging Config for Redmi Note 10 4G (mojito/sunny)
 properties() { '
-kernel.string=UltraCool & FastCharge Kernel for Redmi Note 10 4G (MIUI 14)
+kernel.string=UltraCool Kernel for Redmi Note 10 4G (MIUI 14)
 do.devicecheck=1
 do.modules=0
 do.systemless=1
