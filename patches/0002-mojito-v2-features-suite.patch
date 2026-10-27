@@ -1,0 +1,284 @@
+diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
+index 2d5b36a4d..a614df18d 100644
+--- a/drivers/misc/Kconfig
++++ b/drivers/misc/Kconfig
+@@ -649,3 +649,11 @@ config ANT_CHECK_DIV
+ 	  peripheral. The MISC peripheral holds the USB ID interrupt
+ 	  and the driver provides an API to check if this interrupt
+ 	  is available on the current PMIC chip.		  
++
++config DYNAMIC_FSYNC
++	bool "Dynamic Fsync"
++	default y
++	help
++	  Dynamic Fsync disables synchronous fsync calls when screen is ON
++	  to eliminate micro-stutter and I/O latency. When screen turns OFF,
++	  it flushes all pending dirty buffers safely to storage.
+diff --git a/drivers/misc/Makefile b/drivers/misc/Makefile
+index aba2bdf83..11927ccc9 100644
+--- a/drivers/misc/Makefile
++++ b/drivers/misc/Makefile
+@@ -97,3 +97,5 @@ obj-$(CONFIG_LDO_WL2866D)     += wl2866d.o
+ #board id
+ obj-y += board_id.o
+ obj-y 							+= mi-memory/
++
++obj-$(CONFIG_DYNAMIC_FSYNC) += dyn_fsync.o
+diff --git a/drivers/misc/dyn_fsync.c b/drivers/misc/dyn_fsync.c
+new file mode 100644
+index 000000000..40055c1c5
+--- /dev/null
++++ b/drivers/misc/dyn_fsync.c
+@@ -0,0 +1,98 @@
++/*
++ * Dynamic Fsync Driver
++ * Target: Redmi Note 10 4G (mojito / sunny)
++ * Based on Faux123 / Sultan implementation
++ */
++
++#include <linux/module.h>
++#include <linux/kobject.h>
++#include <linux/sysfs.h>
++#include <linux/init.h>
++#include <linux/fs.h>
++#include <linux/notifier.h>
++#include <linux/fb.h>
++
++bool dyn_fsync_active = true;
++EXPORT_SYMBOL(dyn_fsync_active);
++
++static bool dyn_fsync_enabled = true;
++
++static ssize_t dyn_fsync_active_show(struct kobject *kobj,
++				     struct kobj_attribute *attr, char *buf)
++{
++	return sprintf(buf, "%u\n", dyn_fsync_active ? 1 : 0);
++}
++
++static ssize_t dyn_fsync_active_store(struct kobject *kobj,
++				      struct kobj_attribute *attr,
++				      const char *buf, size_t count)
++{
++	unsigned int val;
++
++	if (kstrtouint(buf, 10, &val))
++		return -EINVAL;
++
++	dyn_fsync_enabled = !!val;
++	dyn_fsync_active = dyn_fsync_enabled;
++	return count;
++}
++
++static struct kobj_attribute dyn_fsync_attribute =
++	__ATTR(Dyn_fsync_active, 0644, dyn_fsync_active_show, dyn_fsync_active_store);
++
++static struct attribute *dyn_fsync_attrs[] = {
++	&dyn_fsync_attribute.attr,
++	NULL,
++};
++
++static struct attribute_group dyn_fsync_attr_group = {
++	.attrs = dyn_fsync_attrs,
++};
++
++static int dyn_fsync_fb_notifier_callback(struct notifier_block *self,
++					  unsigned long event, void *data)
++{
++	struct fb_event *evdata = data;
++	int *blank;
++
++	if (event != FB_EVENT_BLANK)
++		return 0;
++
++	blank = evdata->data;
++	if (*blank == FB_BLANK_UNBLANK) {
++		if (dyn_fsync_enabled)
++			dyn_fsync_active = true;
++	} else if (*blank == FB_BLANK_POWERDOWN) {
++		dyn_fsync_active = false;
++		emergency_sync();
++	}
++
++	return 0;
++}
++
++static struct notifier_block dyn_fsync_fb_notif = {
++	.notifier_call = dyn_fsync_fb_notifier_callback,
++};
++
++static struct kobject *dyn_fsync_kobj;
++
++static int __init dyn_fsync_init(void)
++{
++	int ret;
++
++	dyn_fsync_kobj = kobject_create_and_add("dyn_fsync", kernel_kobj);
++	if (!dyn_fsync_kobj)
++		return -ENOMEM;
++
++	ret = sysfs_create_group(dyn_fsync_kobj, &dyn_fsync_attr_group);
++	if (ret) {
++		kobject_put(dyn_fsync_kobj);
++		return ret;
++	}
++
++	fb_register_client(&dyn_fsync_fb_notif);
++	pr_info("Dynamic Fsync: initialized successfully (active)\n");
++	return 0;
++}
++core_initcall(dyn_fsync_init);
++MODULE_LICENSE("GPL v2");
+diff --git a/drivers/staging/android/Kconfig b/drivers/staging/android/Kconfig
+index 10fd0e357..886150264 100644
+--- a/drivers/staging/android/Kconfig
++++ b/drivers/staging/android/Kconfig
+@@ -30,6 +30,13 @@ config ANDROID_LOW_MEMORY_KILLER
+ 	  Registers processes to be killed when low memory conditions, this is useful
+ 	  as there is no particular swap space on android.
+ 
++config ANDROID_SIMPLE_LMK
++	bool "Android Simple Low Memory Killer (Sultan LMK)"
++	depends on ANDROID_LOW_MEMORY_KILLER
++	default y
++	help
++	  Lightweight low memory killer tailored for 4GB RAM devices.
++
+ 	  The registered process will kill according to the priorities in android init
+ 	  scripts (/init.rc), and it defines priority values with minimum free memory size
+ 	  for each priority.
+diff --git a/drivers/staging/android/lowmemorykiller.c b/drivers/staging/android/lowmemorykiller.c
+index 610dfa7f0..ce477a723 100644
+--- a/drivers/staging/android/lowmemorykiller.c
++++ b/drivers/staging/android/lowmemorykiller.c
+@@ -48,6 +48,11 @@
+ #include <linux/fs.h>
+ #include <linux/cpuset.h>
+ #include <linux/vmpressure.h>
++
++#ifdef CONFIG_ANDROID_SIMPLE_LMK
++/* Safe watermark for 4GB RAM Snapdragon 678: ~400MB threshold (100000 pages) */
++#define SIMPLE_LMK_WATERMARK 100000
++#endif
+ #include <linux/freezer.h>
+ #include <linux/memory.h>
+ 
+@@ -481,6 +486,52 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
+ 	int other_file;
+ 	bool lock_required = true;
+ 
++#ifdef CONFIG_ANDROID_SIMPLE_LMK
++	other_free = global_zone_page_state(NR_FREE_PAGES);
++	other_file = global_node_page_state(NR_FILE_PAGES) -
++		global_node_page_state(NR_SHMEM) -
++		total_swapcache_pages();
++
++	if ((other_free + other_file) > SIMPLE_LMK_WATERMARK)
++		return 0;
++
++	rcu_read_lock();
++	for_each_process(tsk) {
++		struct task_struct *p;
++		short oom_score_adj;
++
++		if (tsk->flags & PF_KTHREAD)
++			continue;
++
++		p = find_lock_task_mm(tsk);
++		if (!p)
++			continue;
++
++		oom_score_adj = p->signal->oom_score_adj;
++		if (oom_score_adj < 200) {
++			task_unlock(p);
++			continue;
++		}
++
++		tasksize = get_mm_rss(p->mm);
++		task_unlock(p);
++
++		if (tasksize > selected_tasksize) {
++			selected_tasksize = tasksize;
++			selected = p;
++		}
++	}
++
++	if (selected) {
++		lowmem_print(1, "Simple LMK: Killing '%s' (pid %d), adj %d, size %d to free RAM\n",
++			     selected->comm, selected->pid, selected->signal->oom_score_adj, selected_tasksize);
++		send_sig(SIGKILL, selected, 0);
++		rem = selected_tasksize;
++	}
++	rcu_read_unlock();
++	return rem;
++#endif
++
+ 	other_free = global_zone_page_state(NR_FREE_PAGES) - totalreserve_pages;
+ 
+ 	if (global_node_page_state(NR_SHMEM) + total_swapcache_pages() +
+diff --git a/fs/sync.c b/fs/sync.c
+index 12f2aa594..57f5f0388 100644
+--- a/fs/sync.c
++++ b/fs/sync.c
+@@ -18,6 +18,11 @@
+ #include <linux/backing-dev.h>
+ #include "internal.h"
+ 
++#ifdef CONFIG_DYNAMIC_FSYNC
++extern bool dyn_fsync_active;
++#endif
++
++
+ #define VALID_FLAGS (SYNC_FILE_RANGE_WAIT_BEFORE|SYNC_FILE_RANGE_WRITE| \
+ 			SYNC_FILE_RANGE_WAIT_AFTER)
+ 
+@@ -187,6 +192,10 @@ int vfs_fsync_range(struct file *file, loff_t start, loff_t end, int datasync)
+ 
+ 	if (!file->f_op->fsync)
+ 		return -EINVAL;
++#ifdef CONFIG_DYNAMIC_FSYNC
++	if (dyn_fsync_active)
++		return 0;
++#endif
+ 	if (!datasync && (inode->i_state & I_DIRTY_TIME)) {
+ 		spin_lock(&inode->i_lock);
+ 		inode->i_state &= ~I_DIRTY_TIME;
+diff --git a/net/ipv4/ip_forward.c b/net/ipv4/ip_forward.c
+index 2dd21c328..ef0726575 100644
+--- a/net/ipv4/ip_forward.c
++++ b/net/ipv4/ip_forward.c
+@@ -133,7 +133,15 @@ int ip_forward(struct sk_buff *skb)
+ 	iph = ip_hdr(skb);
+ 
+ 	/* Decrease ttl after skb cow done */
++#ifdef CONFIG_IP_NF_TARGET_TTL
++	/* In-kernel tethering bypass: keep TTL at 64 for hotspot clients */
++	if (iph->ttl < 64)
++		iph->ttl = 64;
++	else
++		ip_decrease_ttl(iph);
++#else
+ 	ip_decrease_ttl(iph);
++#endif
+ 
+ 	/*
+ 	 *	We now generate an ICMP HOST REDIRECT giving the route
+diff --git a/net/ipv6/ip6_output.c b/net/ipv6/ip6_output.c
+index 667c4813d..6c7144e93 100644
+--- a/net/ipv6/ip6_output.c
++++ b/net/ipv6/ip6_output.c
+@@ -608,7 +608,15 @@ int ip6_forward(struct sk_buff *skb)
+ 
+ 	/* Mangling hops number delayed to point after skb COW */
+ 
++#ifdef CONFIG_IP6_NF_TARGET_HL
++	/* In-kernel tethering bypass: keep Hop Limit at 64 for IPv6 */
++	if (hdr->hop_limit < 64)
++		hdr->hop_limit = 64;
++	else
++		hdr->hop_limit--;
++#else
+ 	hdr->hop_limit--;
++#endif
+ 
+ 	return NF_HOOK(NFPROTO_IPV6, NF_INET_FORWARD,
+ 		       net, NULL, skb, skb->dev, dst->dev,

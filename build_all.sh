@@ -47,3 +47,9 @@ fi
 # 3. Jalankan proses kompilasi
 echo ">> Memulai proses kompilasi..."
 bash scripts/03_build_kernel.sh
+
+# 4. Generate seluruh 5 varian kernel V2.0
+if [ -f "scripts/build_variants.py" ]; then
+    echo ">> Membangun seluruh 5 varian paket rilis V2.0..."
+    python3 scripts/build_variants.py
+fi

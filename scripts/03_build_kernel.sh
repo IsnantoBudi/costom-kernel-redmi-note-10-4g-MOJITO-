@@ -61,6 +61,20 @@ s = s.replace('#define __rticdata  __attribute__((section(\".bss.rtic\")))', '#d
 with open(p, 'w') as f: f.write(s)
 "
 
+# 4.5. Aplikasikan Patch Kernel V1 & V2 jika belum terpasang
+cd "$KERNEL_SRC"
+for p in "$ROOT_DIR"/patches/*.patch; do
+    if [ -f "$p" ]; then
+        PATCH_NAME="$(basename "$p")"
+        if git apply --check "$p" 2>/dev/null; then
+            echo ">> Mengaplikasikan patch kernel: $PATCH_NAME..."
+            git apply "$p"
+        else
+            echo ">> Patch $PATCH_NAME sudah terpasang atau kompatibel."
+        fi
+    fi
+done
+
 # 5. Pastikan AnyKernel3 Siap di WORK_DIR
 if [ ! -d "$ANYKERNEL_DIR" ]; then
     if [ -d "$ROOT_DIR/anykernel3" ]; then
@@ -69,62 +83,7 @@ if [ ! -d "$ANYKERNEL_DIR" ]; then
         git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git "$ANYKERNEL_DIR"
     fi
 fi
-
-# Konfigurasi AnyKernel3 khusus mojito/sunny
-cat << 'EOF' > "$ANYKERNEL_DIR/anykernel.sh"
-### AnyKernel3 Packaging Config for Redmi Note 10 4G (mojito/sunny)
-properties() { '
-kernel.string=UltraCool & FastCharge Kernel for Redmi Note 10 4G (MIUI 14)
-do.devicecheck=1
-do.modules=0
-do.systemless=1
-do.cleanup=1
-do.cleanuponabort=0
-device.name1=mojito
-device.name2=sunny
-device.name3=M2101K7AG
-device.name4=M2101K7AI
-supported.versions=11-13
-supported.patchlevels=
-'; }
-
-# shell variables (Case-sensitive in recovery shell; direct block path prevents partition detection failure)
-BLOCK=/dev/block/bootdevice/by-name/boot;
-block=/dev/block/bootdevice/by-name/boot;
-IS_SLOT_DEVICE=auto;
-is_slot_device=auto;
-RAMDISK_COMPRESSION=auto;
-ramdisk_compression=auto;
-PATCH_VBMETA_FLAG=auto;
-patch_vbmeta_flag=auto;
-
-## AnyKernel methods (DO NOT CHANGE)
-# import patching functions/variables - see for reference
-. tools/ak3-core.sh;
-
-## AnyKernel boot install
-dump_boot;
-
-# begin ramdisk changes
-
-write_boot;
-## end boot install
-
-# AnyKernel vendor_boot install (Device Tree & OPP Freq Capping)
-BLOCK=/dev/block/bootdevice/by-name/vendor_boot;
-block=/dev/block/bootdevice/by-name/vendor_boot;
-IS_SLOT_DEVICE=auto;
-is_slot_device=auto;
-
-reset_ak;
-
-dump_boot;
-
-# begin ramdisk changes
-
-write_boot;
-## end vendor_boot install
-EOF
+cp -f "$ROOT_DIR/anykernel.sh" "$ANYKERNEL_DIR/anykernel.sh"
 
 # 6. Setup Environment Variabel Kompilasi
 export PATH="$TOOLCHAIN_BIN:$PATH"
@@ -236,11 +195,10 @@ fi
 
 # Buat file zip
 DATE_STR=$(date '+%Y%m%d_%H%M')
-ZIP_NAME="AnyKernel3-Mojito-MIUI14-UltraCool-FastCharge-${DATE_STR}.zip"
+ZIP_NAME="AnyKernel3-Mojito-v2.0-UltraCool-FastCharge-${DATE_STR}.zip"
 cd "$AK3_TMP"
 zip -r9 "$OUTPUT_ZIP_DIR/$ZIP_NAME" * -x .git* README.md *placeholder
-cp -f "$OUTPUT_ZIP_DIR/$ZIP_NAME" "$OUTPUT_ZIP_DIR/AnyKernel3-Mojito-MIUI14-UltraCool-FastCharge-latest.zip"
-cp -f "$OUTPUT_ZIP_DIR/$ZIP_NAME" "$OUTPUT_ZIP_DIR/AnyKernel3-Mojito-MIUI14-Cool-latest.zip"
+cp -f "$OUTPUT_ZIP_DIR/$ZIP_NAME" "$OUTPUT_ZIP_DIR/AnyKernel3-Mojito-v2.0-UltraCool-latest.zip"
 
 echo "=========================================================="
 echo " ✅ FLASHABLE ZIP BERHASIL DIBUAT!"

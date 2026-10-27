@@ -41,8 +41,8 @@ BIG_FREQS = [
 VARIANTS = [
     {
         "name": "UltraCool",
-        "zip_name": "AnyKernel3-Mojito-UltraCool-Big1.9-Little1.5.zip",
-        "string": "UltraCool Kernel (Big 1.9GHz / Little 1.5GHz) - Redmi Note 10 4G",
+        "zip_name": "AnyKernel3-Mojito-v2.0-UltraCool-Big1.9-Little1.5.zip",
+        "string": "UltraCool Kernel v2.0 (Big 1.9GHz / Little 1.5GHz) - Redmi Note 10 4G",
         "max_big": 1900800,
         "max_little": 1516800,
         "cpu0_floor_state": 0,  # 1516800 is idx 0 in descending
@@ -51,8 +51,8 @@ VARIANTS = [
     },
     {
         "name": "Cool",
-        "zip_name": "AnyKernel3-Mojito-Cool-Big2.0-Little1.6.zip",
-        "string": "Cool Balanced Kernel (Big 2.0GHz / Little 1.6GHz) - Redmi Note 10 4G",
+        "zip_name": "AnyKernel3-Mojito-v2.0-Cool-Big2.0-Little1.6.zip",
+        "string": "Cool Balanced Kernel v2.0 (Big 2.0GHz / Little 1.6GHz) - Redmi Note 10 4G",
         "max_big": 2016000,
         "max_little": 1593600,
         "cpu0_floor_state": 1,  # 1593600(0), 1516800(1)
@@ -61,8 +61,8 @@ VARIANTS = [
     },
     {
         "name": "Performance",
-        "zip_name": "AnyKernel3-Mojito-Performance-Big2.1-Little1.7.zip",
-        "string": "Performance Kernel (Big 2.1GHz / Little 1.7GHz) - Redmi Note 10 4G",
+        "zip_name": "AnyKernel3-Mojito-v2.0-Performance-Big2.1-Little1.7.zip",
+        "string": "Performance Kernel v2.0 (Big 2.1GHz / Little 1.7GHz) - Redmi Note 10 4G",
         "max_big": 2112000,
         "max_little": 1708800,
         "cpu0_floor_state": 2,  # 1708800(0), 1593600(1), 1516800(2)
@@ -71,8 +71,8 @@ VARIANTS = [
     },
     {
         "name": "StockMax",
-        "zip_name": "AnyKernel3-Mojito-StockMax-Big2.2-Little1.7.zip",
-        "string": "StockMax Kernel (Big 2.2GHz / Little 1.7GHz) - Redmi Note 10 4G",
+        "zip_name": "AnyKernel3-Mojito-v2.0-StockMax-Big2.2-Little1.7.zip",
+        "string": "StockMax Kernel v2.0 (Big 2.2GHz / Little 1.7GHz) - Redmi Note 10 4G",
         "max_big": 2208000,
         "max_little": 1708800,
         "cpu0_floor_state": 2,
@@ -81,8 +81,8 @@ VARIANTS = [
     },
     {
         "name": "FullStock",
-        "zip_name": "AnyKernel3-Mojito-FullStock-Big2.2-Little1.8.zip",
-        "string": "FullStock Kernel (Big 2.2GHz / Little 1.8GHz) - Redmi Note 10 4G",
+        "zip_name": "AnyKernel3-Mojito-v2.0-FullStock-Big2.2-Little1.8.zip",
+        "string": "FullStock Kernel v2.0 (Big 2.2GHz / Little 1.8GHz) - Redmi Note 10 4G",
         "max_big": 2208000,
         "max_little": 1804800,
         "cpu0_floor_state": 3,  # 1804800(0), 1708800(1), 1593600(2), 1516800(3)
@@ -206,10 +206,8 @@ def package_variant(var):
         raise RuntimeError(f"Gagal membuat zip {zip_dest}")
 
     if var.get("is_primary"):
-        latest1 = os.path.join(OUTPUT_ZIP_DIR, "AnyKernel3-Mojito-MIUI14-UltraCool-FastCharge-latest.zip")
-        latest2 = os.path.join(OUTPUT_ZIP_DIR, "AnyKernel3-Mojito-MIUI14-Cool-latest.zip")
+        latest1 = os.path.join(OUTPUT_ZIP_DIR, "AnyKernel3-Mojito-v2.0-UltraCool-latest.zip")
         shutil.copyfile(zip_dest, latest1)
-        shutil.copyfile(zip_dest, latest2)
 
     sz = os.path.getsize(zip_dest) / (1024 * 1024)
     print(f"  [OK] {var['zip_name']} ({sz:.2f} MB)")
